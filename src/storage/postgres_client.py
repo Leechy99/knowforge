@@ -6,9 +6,9 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Column, String, Text, Float, DateTime, Index
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy import Column, DateTime, Float, Index, String, Text, or_, select
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -37,6 +37,25 @@ class DocumentRecord(Base):
 
 def _get_record_metadata(record: Any) -> dict[str, Any]:
     return getattr(record, "metadata_json", getattr(record, "metadata", {}))
+
+
+def _record_to_document(record: DocumentRecord) -> dict[str, Any]:
+    return {
+        "id": str(record.id),
+        "source_type": record.source_type,
+        "source_url": record.source_url,
+        "content_type": record.content_type,
+        "metadata": _get_record_metadata(record),
+        "content": {
+            "text": record.content_text,
+            "chunks": record.chunks,
+        },
+        "content_text": record.content_text,
+        "chunks": record.chunks,
+        "quality_score": record.quality_score,
+        "created_at": record.created_at.isoformat(),
+        "processed_at": record.processed_at.isoformat() if record.processed_at else None,
+    }
 
 
 class PostgresClient:
@@ -83,19 +102,57 @@ class PostgresClient:
         try:
             result = await session.get(DocumentRecord, uuid.UUID(doc_id))
             if result:
-                return {
-                    "id": str(result.id),
-                    "source_type": result.source_type,
-                    "source_url": result.source_url,
-                    "content_type": result.content_type,
-                    "metadata": _get_record_metadata(result),
-                    "content_text": result.content_text,
-                    "chunks": result.chunks,
-                    "quality_score": result.quality_score,
-                    "created_at": result.created_at.isoformat(),
-                    "processed_at": result.processed_at.isoformat() if result.processed_at else None,
-                }
+                return _record_to_document(result)
             return None
+        finally:
+            close = getattr(session, "close", None)
+            if close:
+                close_result = close()
+                if inspect.isawaitable(close_result):
+                    await close_result
+
+    async def get_documents(self, doc_ids: list[str]) -> list[dict[str, Any]]:
+        documents = []
+        for doc_id in doc_ids:
+            document = await self.get_document(doc_id)
+            if document:
+                documents.append(document)
+        return documents
+
+    async def list_documents(self, limit: int = 100) -> list[dict[str, Any]]:
+        session = self.session_factory()
+        try:
+            statement = (
+                select(DocumentRecord)
+                .order_by(DocumentRecord.created_at.desc())
+                .limit(limit)
+            )
+            result = await session.execute(statement)
+            return [_record_to_document(record) for record in result.scalars()]
+        finally:
+            close = getattr(session, "close", None)
+            if close:
+                close_result = close()
+                if inspect.isawaitable(close_result):
+                    await close_result
+
+    async def search_documents(self, query: str, limit: int = 100) -> list[dict[str, Any]]:
+        session = self.session_factory()
+        try:
+            pattern = f"%{query}%"
+            statement = (
+                select(DocumentRecord)
+                .where(
+                    or_(
+                        DocumentRecord.content_text.ilike(pattern),
+                        DocumentRecord.source_url.ilike(pattern),
+                    )
+                )
+                .order_by(DocumentRecord.created_at.desc())
+                .limit(limit)
+            )
+            result = await session.execute(statement)
+            return [_record_to_document(record) for record in result.scalars()]
         finally:
             close = getattr(session, "close", None)
             if close:

@@ -81,6 +81,19 @@ Then open:
 http://localhost:8000/docs
 ```
 
+On application startup, `src.main` wires the runtime query services into FastAPI
+state:
+
+- `qa_service`: `RAGQA` backed by Qdrant, PostgreSQL, Neo4j, and the lazy BGE
+  vectorizer
+- `search_service`: `VectorSearch` backed by Qdrant and the same vectorizer
+- `document_service`: `PostgresClient`, used by export routes to load documents by
+  ID, list recent documents, or search document text/source URLs
+
+With local infrastructure running, `/api/v1/qa`, `/api/v1/search`, and
+`/api/v1/export` are available immediately after a fresh API boot instead of requiring
+manual test-time service injection.
+
 ## API Overview
 
 | Method | Endpoint | Purpose |
@@ -91,6 +104,10 @@ http://localhost:8000/docs
 | `GET` | `/api/v1/export` | Export documents |
 | `GET` | `/api/v1/failures` | List processing failures |
 | `POST` | `/api/v1/failures/{id}/feedback` | Submit failure feedback |
+
+`/api/v1/export` accepts `format=markdown|json|graph`, optional comma-separated
+`ids`, or a `query` parameter. When no IDs or query are provided, it exports the latest
+documents from PostgreSQL.
 
 ## Development
 
@@ -105,7 +122,7 @@ mypy src
 Current test status in this workspace:
 
 ```text
-330 passed
+334 passed
 ```
 
 `ruff` and `mypy` are enabled but still surface existing cleanup/type-debt items. The

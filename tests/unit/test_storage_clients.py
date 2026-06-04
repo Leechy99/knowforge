@@ -55,7 +55,7 @@ class TestPostgresClient:
     @pytest.mark.asyncio
     async def test_get_document(self, sample_document):
         """Test retrieving a document from PostgreSQL"""
-        from src.storage.postgres_client import PostgresClient, DocumentRecord
+        from src.storage.postgres_client import DocumentRecord, PostgresClient
 
         with patch("src.storage.postgres_client.create_async_engine") as mock_engine:
             with patch("src.storage.postgres_client.async_sessionmaker") as mock_sessionmaker:
@@ -88,6 +88,95 @@ class TestPostgresClient:
                 assert result is not None
                 assert result["source_type"] == "article"
                 assert result["content_type"] == "article"
+                assert result["content"] == {"text": "content", "chunks": []}
+
+    @pytest.mark.asyncio
+    async def test_get_documents_filters_missing_documents(self):
+        """Test retrieving multiple documents skips missing IDs"""
+        from src.storage.postgres_client import PostgresClient
+
+        with patch("src.storage.postgres_client.create_async_engine") as mock_engine:
+            with patch("src.storage.postgres_client.async_sessionmaker") as mock_sessionmaker:
+                mock_engine.return_value = MagicMock()
+                mock_sessionmaker.return_value = MagicMock()
+                client = PostgresClient("postgresql://localhost/test")
+                client.get_document = AsyncMock(
+                    side_effect=[{"id": "doc-1"}, None, {"id": "doc-3"}]
+                )
+
+                result = await client.get_documents(["doc-1", "missing", "doc-3"])
+
+                assert result == [{"id": "doc-1"}, {"id": "doc-3"}]
+
+    @pytest.mark.asyncio
+    async def test_list_documents(self):
+        """Test listing documents from PostgreSQL"""
+        from src.storage.postgres_client import DocumentRecord, PostgresClient
+
+        with patch("src.storage.postgres_client.create_async_engine") as mock_engine:
+            with patch("src.storage.postgres_client.async_sessionmaker") as mock_sessionmaker:
+                mock_engine.return_value = MagicMock()
+                mock_sessionmaker.return_value = MagicMock()
+                client = PostgresClient("postgresql://localhost/test")
+
+                mock_record = MagicMock(spec=DocumentRecord)
+                mock_record.id = uuid.uuid4()
+                mock_record.source_type = "article"
+                mock_record.source_url = "https://example.com/article"
+                mock_record.content_type = "article"
+                mock_record.metadata = {"title": "Test"}
+                mock_record.content_text = "content"
+                mock_record.chunks = []
+                mock_record.quality_score = 0.5
+                mock_record.created_at = datetime.utcnow()
+                mock_record.processed_at = datetime.utcnow()
+
+                mock_result = MagicMock()
+                mock_result.scalars.return_value = [mock_record]
+                mock_session = AsyncMock()
+                mock_session.execute = AsyncMock(return_value=mock_result)
+                client.session_factory = MagicMock(return_value=mock_session)
+
+                result = await client.list_documents(limit=5)
+
+                assert len(result) == 1
+                assert result[0]["content"]["text"] == "content"
+                mock_session.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_search_documents(self):
+        """Test searching documents from PostgreSQL"""
+        from src.storage.postgres_client import DocumentRecord, PostgresClient
+
+        with patch("src.storage.postgres_client.create_async_engine") as mock_engine:
+            with patch("src.storage.postgres_client.async_sessionmaker") as mock_sessionmaker:
+                mock_engine.return_value = MagicMock()
+                mock_sessionmaker.return_value = MagicMock()
+                client = PostgresClient("postgresql://localhost/test")
+
+                mock_record = MagicMock(spec=DocumentRecord)
+                mock_record.id = uuid.uuid4()
+                mock_record.source_type = "article"
+                mock_record.source_url = "https://example.com/article"
+                mock_record.content_type = "article"
+                mock_record.metadata = {"title": "Test"}
+                mock_record.content_text = "content"
+                mock_record.chunks = []
+                mock_record.quality_score = 0.5
+                mock_record.created_at = datetime.utcnow()
+                mock_record.processed_at = datetime.utcnow()
+
+                mock_result = MagicMock()
+                mock_result.scalars.return_value = [mock_record]
+                mock_session = AsyncMock()
+                mock_session.execute = AsyncMock(return_value=mock_result)
+                client.session_factory = MagicMock(return_value=mock_session)
+
+                result = await client.search_documents("content", limit=5)
+
+                assert len(result) == 1
+                assert result[0]["content"]["text"] == "content"
+                mock_session.execute.assert_called_once()
 
 
 class TestQdrantVectorStore:

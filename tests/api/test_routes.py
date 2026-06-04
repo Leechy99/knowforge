@@ -6,10 +6,16 @@ from fastapi.testclient import TestClient
 
 from src.learning.failure_tracker import FailureTracker, FailureType
 from src.main import app
+from src.query.rag import RAGQA
+from src.query.vector_search import VectorSearch
 
 
 def _clear_state() -> None:
     for name in (
+        "postgres_client",
+        "vector_store",
+        "neo4j_client",
+        "vectorizer",
         "qa_service",
         "search_service",
         "document_service",
@@ -70,6 +76,16 @@ class TestHealthEndpoint:
         assert response.json() == {"status": "healthy"}
 
 
+class TestAppStartup:
+    def test_lifespan_initializes_query_and_document_services(self, client):
+        assert isinstance(app.state.qa_service, RAGQA)
+        assert isinstance(app.state.search_service, VectorSearch)
+        assert hasattr(app.state.document_service, "get_document")
+        assert hasattr(app.state.document_service, "get_documents")
+        assert hasattr(app.state.document_service, "list_documents")
+        assert hasattr(app.state.document_service, "search_documents")
+
+
 class TestQARoutes:
     def test_ask_question_calls_service(self, client):
         app.state.qa_service = FakeQAService()
@@ -97,6 +113,8 @@ class TestQARoutes:
         assert response.json()["mode"] == "vector"
 
     def test_ask_question_without_service_returns_503(self, client):
+        delattr(app.state, "qa_service")
+
         response = client.post(
             "/api/v1/qa",
             json={"question": "What is AI?"},
@@ -128,6 +146,8 @@ class TestSearchRoutes:
         assert data["total"] == 1
 
     def test_search_without_service_returns_503(self, client):
+        delattr(app.state, "search_service")
+
         response = client.post(
             "/api/v1/search",
             json={"query": "test query"},
@@ -154,6 +174,8 @@ class TestExportRoutes:
         assert response.json()["detail"] == "No documents found"
 
     def test_export_without_service_returns_503(self, client):
+        delattr(app.state, "document_service")
+
         response = client.get("/api/v1/export")
 
         assert response.status_code == 503
@@ -233,14 +255,18 @@ class TestFailureRoutes:
 
 class TestAPIRoutesPresence:
     def test_all_routers_registered(self, client):
+        app.state.qa_service = FakeQAService()
+        app.state.search_service = FakeSearchService()
+        app.state.document_service = FakeDocumentService()
+
         response = client.post("/api/v1/qa", json={"question": "test"})
-        assert response.status_code == 503
+        assert response.status_code == 200
 
         response = client.post("/api/v1/search", json={"query": "test"})
-        assert response.status_code == 503
+        assert response.status_code == 200
 
         response = client.get("/api/v1/export")
-        assert response.status_code == 503
+        assert response.status_code == 200
 
         response = client.get("/api/v1/failures")
         assert response.status_code == 200
