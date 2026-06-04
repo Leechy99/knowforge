@@ -11,6 +11,7 @@ from src.api import export, failures, qa, search
 from src.config import get_settings
 from src.learning.failure_tracker import FailureTracker
 from src.processors.vectorizer import ContentVectorizer
+from src.query.document_service import DocumentService
 from src.query.rag import RAGQA
 from src.query.vector_search import VectorSearch
 from src.storage.neo4j_client import Neo4jGraphStore
@@ -47,7 +48,7 @@ async def lifespan(app: FastAPI):
             vectorizer=app.state.vectorizer,
         )
     if not hasattr(app.state, "document_service"):
-        app.state.document_service = app.state.postgres_client
+        app.state.document_service = DocumentService(app.state.postgres_client)
     if not hasattr(app.state, "failure_tracker"):
         app.state.failure_tracker = FailureTracker(postgres_dsn=settings.postgres_dsn)
     try:

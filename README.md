@@ -87,8 +87,9 @@ state:
 - `qa_service`: `RAGQA` backed by Qdrant, PostgreSQL, Neo4j, and the lazy BGE
   vectorizer
 - `search_service`: `VectorSearch` backed by Qdrant and the same vectorizer
-- `document_service`: `PostgresClient`, used by export routes to load documents by
-  ID, list recent documents, or search document text/source URLs
+- `document_service`: `DocumentService`, a query-layer adapter backed by
+  `PostgresClient`, used by export routes to load documents by ID, list recent
+  documents, or search document text/source URLs
 
 With local infrastructure running, `/api/v1/qa`, `/api/v1/search`, and
 `/api/v1/export` are available immediately after a fresh API boot instead of requiring

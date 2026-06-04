@@ -1,11 +1,13 @@
 """
 Query Layer - RAG QA, Vector Search, Graph Query, and Export capabilities
 """
-from src.query.export import ExportService, MarkdownExporter, JSONExporter, GraphExporter
+from src.query.document_service import DocumentService
+from src.query.export import ExportService, GraphExporter, JSONExporter, MarkdownExporter
 
 __all__ = [
+    "DocumentService",
     "ExportService",
-    "MarkdownExporter",
-    "JSONExporter",
     "GraphExporter",
+    "JSONExporter",
+    "MarkdownExporter",
 ]

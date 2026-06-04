@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from src.learning.failure_tracker import FailureTracker, FailureType
 from src.main import app
+from src.query.document_service import DocumentService
 from src.query.rag import RAGQA
 from src.query.vector_search import VectorSearch
 
@@ -33,40 +34,13 @@ def client():
     _clear_state()
 
 
-class FakeQAService:
-    async def ask(self, question, filters=None, mode="hybrid", limit=10):
-        return {
-            "answer": f"Answer for {question}",
-            "sources": [{"id": "doc-1", "score": 0.9}],
-            "mode": mode,
-        }
-
-
-class FakeSearchService:
-    def search(self, query, limit=20, filters=None):
-        return [{"id": "doc-1", "query": query, "score": 0.95}][:limit]
-
-
-class FakeDocumentService:
-    def __init__(self):
-        self.documents = {
-            "doc-1": {
-                "id": "doc-1",
-                "source_type": "file",
-                "source_url": "/tmp/doc.md",
-                "metadata": {"title": "Doc 1", "tags": ["ai"]},
-                "content": {"text": "Document text"},
-            }
-        }
-
-    def get_documents(self, ids):
-        return [self.documents[doc_id] for doc_id in ids if doc_id in self.documents]
-
-    def search_documents(self, query):
-        return list(self.documents.values()) if query else []
-
-    def list_documents(self):
-        return list(self.documents.values())
+SAMPLE_DOCUMENT = {
+    "id": "doc-1",
+    "source_type": "file",
+    "source_url": "/tmp/doc.md",
+    "metadata": {"title": "Doc 1", "tags": ["ai"]},
+    "content": {"text": "Document text"},
+}
 
 
 class TestHealthEndpoint:
@@ -80,6 +54,7 @@ class TestAppStartup:
     def test_lifespan_initializes_query_and_document_services(self, client):
         assert isinstance(app.state.qa_service, RAGQA)
         assert isinstance(app.state.search_service, VectorSearch)
+        assert isinstance(app.state.document_service, DocumentService)
         assert hasattr(app.state.document_service, "get_document")
         assert hasattr(app.state.document_service, "get_documents")
         assert hasattr(app.state.document_service, "list_documents")
@@ -87,8 +62,12 @@ class TestAppStartup:
 
 
 class TestQARoutes:
-    def test_ask_question_calls_service(self, client):
-        app.state.qa_service = FakeQAService()
+    def test_ask_question_uses_startup_service(self, client):
+        app.state.vectorizer.encode_single = lambda text: [0.1] * 1024
+        app.state.vector_store.search = lambda **kwargs: [
+            {"id": "doc-1", "score": 0.9, "payload": {"content_text": "AI content"}}
+        ]
+        app.state.neo4j_client.query_cypher = AsyncQuery([])
 
         response = client.post(
             "/api/v1/qa",
@@ -97,12 +76,15 @@ class TestQARoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["answer"] == "Answer for What is AI?"
-        assert data["sources"] == [{"id": "doc-1", "score": 0.9}]
+        assert data["answer"] == "Based on 1 relevant documents, the answer would be generated here."
+        assert data["sources"] == [{"id": "doc-1", "score": 0.9, "content": "AI content"}]
         assert data["mode"] == "hybrid"
 
-    def test_ask_question_with_mode(self, client):
-        app.state.qa_service = FakeQAService()
+    def test_ask_question_with_mode_uses_startup_service(self, client):
+        app.state.vectorizer.encode_single = lambda text: [0.1] * 1024
+        app.state.vector_store.search = lambda **kwargs: [
+            {"id": "doc-1", "score": 0.9, "payload": {"content_text": "AI content"}}
+        ]
 
         response = client.post(
             "/api/v1/qa",
@@ -132,8 +114,11 @@ class TestQARoutes:
 
 
 class TestSearchRoutes:
-    def test_search_calls_service(self, client):
-        app.state.search_service = FakeSearchService()
+    def test_search_uses_startup_service(self, client):
+        app.state.vectorizer.encode_single = lambda text: [0.1] * 1024
+        app.state.vector_store.search = lambda **kwargs: [
+            {"id": "doc-1", "score": 0.95, "payload": {"query": "test query"}}
+        ][: kwargs["limit"]]
 
         response = client.post(
             "/api/v1/search",
@@ -142,7 +127,9 @@ class TestSearchRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["results"] == [{"id": "doc-1", "query": "test query", "score": 0.95}]
+        assert data["results"] == [
+            {"id": "doc-1", "score": 0.95, "payload": {"query": "test query"}}
+        ]
         assert data["total"] == 1
 
     def test_search_without_service_returns_503(self, client):
@@ -166,7 +153,7 @@ class TestSearchRoutes:
 
 class TestExportRoutes:
     def test_export_no_documents(self, client):
-        app.state.document_service = FakeDocumentService()
+        app.state.postgres_client.get_documents = AsyncQuery([])
 
         response = client.get("/api/v1/export?ids=missing")
 
@@ -182,7 +169,7 @@ class TestExportRoutes:
         assert response.json()["detail"] == "Document service unavailable"
 
     def test_export_by_ids(self, client):
-        app.state.document_service = FakeDocumentService()
+        app.state.postgres_client.get_documents = AsyncQuery([SAMPLE_DOCUMENT])
 
         response = client.get("/api/v1/export?ids=doc-1")
 
@@ -190,7 +177,7 @@ class TestExportRoutes:
         assert "Document text" in response.text
 
     def test_export_format_query(self, client):
-        app.state.document_service = FakeDocumentService()
+        app.state.postgres_client.search_documents = AsyncQuery([SAMPLE_DOCUMENT])
 
         response = client.get("/api/v1/export?format=json&query=ai")
 
@@ -255,9 +242,12 @@ class TestFailureRoutes:
 
 class TestAPIRoutesPresence:
     def test_all_routers_registered(self, client):
-        app.state.qa_service = FakeQAService()
-        app.state.search_service = FakeSearchService()
-        app.state.document_service = FakeDocumentService()
+        app.state.vectorizer.encode_single = lambda text: [0.1] * 1024
+        app.state.vector_store.search = lambda **kwargs: [
+            {"id": "doc-1", "score": 0.95, "payload": {"content_text": "content"}}
+        ]
+        app.state.neo4j_client.query_cypher = AsyncQuery([])
+        app.state.postgres_client.list_documents = AsyncQuery([SAMPLE_DOCUMENT])
 
         response = client.post("/api/v1/qa", json={"question": "test"})
         assert response.status_code == 200
@@ -270,3 +260,11 @@ class TestAPIRoutesPresence:
 
         response = client.get("/api/v1/failures")
         assert response.status_code == 200
+
+
+class AsyncQuery:
+    def __init__(self, result):
+        self.result = result
+
+    async def __call__(self, *args, **kwargs):
+        return self.result

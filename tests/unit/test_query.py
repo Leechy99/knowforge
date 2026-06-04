@@ -1,8 +1,8 @@
 """
 Unit tests for query layer - RAG and Export modules
 """
-import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+import json
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -175,6 +175,56 @@ class TestVectorSearch:
             filters=None,
             score_threshold=None,
         )
+
+
+class TestDocumentService:
+    """Tests for query-facing document access."""
+
+    @pytest.fixture
+    def mock_postgres(self):
+        return AsyncMock()
+
+    @pytest.fixture
+    def document_service(self, mock_postgres):
+        from src.query.document_service import DocumentService
+
+        return DocumentService(postgres_client=mock_postgres)
+
+    @pytest.mark.asyncio
+    async def test_get_document_delegates_to_postgres(self, document_service, mock_postgres):
+        mock_postgres.get_document.return_value = {"id": "doc-1"}
+
+        result = await document_service.get_document("doc-1")
+
+        assert result == {"id": "doc-1"}
+        mock_postgres.get_document.assert_awaited_once_with("doc-1")
+
+    @pytest.mark.asyncio
+    async def test_get_documents_delegates_to_postgres(self, document_service, mock_postgres):
+        mock_postgres.get_documents.return_value = [{"id": "doc-1"}]
+
+        result = await document_service.get_documents(["doc-1"])
+
+        assert result == [{"id": "doc-1"}]
+        mock_postgres.get_documents.assert_awaited_once_with(["doc-1"])
+
+    @pytest.mark.asyncio
+    async def test_list_documents_delegates_to_postgres(self, document_service, mock_postgres):
+        mock_postgres.list_documents.return_value = [{"id": "doc-1"}]
+
+        result = await document_service.list_documents(limit=5)
+
+        assert result == [{"id": "doc-1"}]
+        mock_postgres.list_documents.assert_awaited_once_with(limit=5)
+
+    @pytest.mark.asyncio
+    async def test_search_documents_delegates_to_postgres(self, document_service, mock_postgres):
+        mock_postgres.search_documents.return_value = [{"id": "doc-1"}]
+
+        result = await document_service.search_documents("ai", limit=5)
+
+        assert result == [{"id": "doc-1"}]
+        mock_postgres.search_documents.assert_awaited_once_with("ai", limit=5)
 
 
 class TestGraphQuery:
@@ -400,7 +450,6 @@ class TestJSONExporter:
     def test_format_structure(self):
         """Test JSON export has correct structure"""
         from src.query.export import JSONExporter
-        import json
 
         exporter = JSONExporter()
         doc = {
@@ -423,7 +472,6 @@ class TestGraphExporter:
     def test_format_creates_nodes_and_edges(self):
         """Test Graph export creates proper node/edge structure"""
         from src.query.export import GraphExporter
-        import json
 
         exporter = GraphExporter()
         doc = {
@@ -448,7 +496,6 @@ class TestGraphExporter:
     def test_format_handles_missing_entity_refs(self):
         """Test Graph export handles missing entity references gracefully"""
         from src.query.export import GraphExporter
-        import json
 
         exporter = GraphExporter()
         doc = {
