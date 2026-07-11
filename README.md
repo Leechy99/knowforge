@@ -63,6 +63,12 @@ cp docker/.env.example .env
 
 Edit `.env` as needed for your local services.
 
+The canonical runtime variables are `POSTGRES_DSN`, `QDRANT_URL`,
+`QDRANT_COLLECTION_NAME`, `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`,
+`MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET_NAME`,
+`EMBEDDING_MODEL`, and `EMBEDDING_DIMENSION`. Keep the embedding model and vector
+dimension aligned; the default BGE large Chinese model uses 1024 dimensions.
+
 ### 4. Run tests
 
 ```bash

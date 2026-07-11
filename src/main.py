@@ -26,7 +26,11 @@ async def lifespan(app: FastAPI):
     if not hasattr(app.state, "postgres_client"):
         app.state.postgres_client = PostgresClient(dsn=settings.postgres_dsn)
     if not hasattr(app.state, "vector_store"):
-        app.state.vector_store = QdrantVectorStore(url=settings.qdrant_url)
+        app.state.vector_store = QdrantVectorStore(
+            url=settings.qdrant_url,
+            dimension=settings.embedding_dimension,
+            collection_name=settings.qdrant_collection_name,
+        )
     if not hasattr(app.state, "neo4j_client"):
         app.state.neo4j_client = Neo4jGraphStore(
             uri=settings.neo4j_uri,
@@ -34,7 +38,12 @@ async def lifespan(app: FastAPI):
             password=settings.neo4j_password,
         )
     if not hasattr(app.state, "vectorizer"):
-        app.state.vectorizer = ContentVectorizer()
+        app.state.vectorizer = ContentVectorizer(
+            model_name=settings.embedding_model,
+            dimension=settings.embedding_dimension,
+            batch_size=settings.embedding_batch_size,
+            device=settings.embedding_device,
+        )
     if not hasattr(app.state, "qa_service"):
         app.state.qa_service = RAGQA(
             vector_store=app.state.vector_store,

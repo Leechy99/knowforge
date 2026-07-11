@@ -11,21 +11,27 @@ from qdrant_client.http.models import Distance, VectorParams, PointStruct
 class QdrantVectorStore:
     COLLECTION_NAME = "ai_knowledge_base"
 
-    def __init__(self, url: str = "http://localhost:6333", dimension: int = 1024):
+    def __init__(
+        self,
+        url: str = "http://localhost:6333",
+        dimension: int = 1024,
+        collection_name: str = COLLECTION_NAME,
+    ):
         self.client = QdrantClient(url=url)
         self.dimension = dimension
+        self.collection_name = collection_name
 
     def create_collection(self, recreate: bool = False):
         if recreate:
-            self.client.delete_collection(self.COLLECTION_NAME)
+            self.client.delete_collection(self.collection_name)
         self.client.create_collection(
-            collection_name=self.COLLECTION_NAME,
+            collection_name=self.collection_name,
             vectors_config=VectorParams(size=self.dimension, distance=Distance.COSINE),
         )
 
     def upsert_vectors(self, points: list[dict[str, Any]]):
         self.client.upsert(
-            collection_name=self.COLLECTION_NAME,
+            collection_name=self.collection_name,
             points=[
                 PointStruct(
                     id=p["id"],
@@ -44,7 +50,7 @@ class QdrantVectorStore:
         score_threshold: float | None = None,
     ) -> list[dict[str, Any]]:
         results = self.client.search(
-            collection_name=self.COLLECTION_NAME,
+            collection_name=self.collection_name,
             query_vector=query_vector,
             limit=limit,
             query_filter=filters,
