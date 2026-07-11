@@ -49,6 +49,45 @@ class TestHealthEndpoint:
         assert response.status_code == 200
         assert response.json() == {"status": "healthy"}
 
+    def test_liveness_check(self, client):
+        response = client.get("/health/live")
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "alive"}
+
+    def test_readiness_check_when_dependencies_are_ready(self, client):
+        app.state.postgres_client.health_check = AsyncQuery(None)
+        app.state.vector_store.health_check = lambda: None
+        app.state.neo4j_client.health_check = AsyncQuery(None)
+
+        response = client.get("/health/ready")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "ready",
+            "dependencies": {
+                "postgres": "ready",
+                "qdrant": "ready",
+                "neo4j": "ready",
+            },
+        }
+
+    def test_readiness_check_sanitizes_dependency_failure(self, client):
+        app.state.postgres_client.health_check = AsyncQuery(None)
+
+        def fail_with_secret():
+            raise RuntimeError("postgresql://user:secret@localhost/db")
+
+        app.state.vector_store.health_check = fail_with_secret
+        app.state.neo4j_client.health_check = AsyncQuery(None)
+
+        response = client.get("/health/ready")
+
+        assert response.status_code == 503
+        assert response.json()["status"] == "not_ready"
+        assert response.json()["dependencies"]["qdrant"] == "unavailable"
+        assert "secret" not in response.text
+
 
 class TestAppStartup:
     def test_lifespan_initializes_query_and_document_services(self, client):

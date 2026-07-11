@@ -16,6 +16,9 @@ class Neo4jGraphStore:
         if inspect.isawaitable(result):
             await result
 
+    async def health_check(self) -> None:
+        await self.driver.verify_connectivity()
+
     async def create_document_graph(self, doc: dict[str, Any]):
         entities = doc.get("content", {}).get("entities", [])
         async with self.driver.session() as session:

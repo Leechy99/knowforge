@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api import export, failures, qa, search
+from src.api import export, failures, health, qa, search
 from src.config import get_settings
 from src.learning.failure_tracker import FailureTracker
 from src.processors.vectorizer import ContentVectorizer
@@ -100,6 +100,7 @@ app.include_router(qa.router, prefix="/api/v1", tags=["QA"])
 app.include_router(search.router, prefix="/api/v1", tags=["Search"])
 app.include_router(export.router, prefix="/api/v1", tags=["Export"])
 app.include_router(failures.router, prefix="/api/v1", tags=["Failures"])
+app.include_router(health.router, tags=["Health"])
 
 
 @app.get("/health")

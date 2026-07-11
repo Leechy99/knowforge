@@ -29,6 +29,9 @@ class QdrantVectorStore:
             vectors_config=VectorParams(size=self.dimension, distance=Distance.COSINE),
         )
 
+    def health_check(self) -> None:
+        self.client.get_collections()
+
     def upsert_vectors(self, points: list[dict[str, Any]]):
         self.client.upsert(
             collection_name=self.collection_name,
