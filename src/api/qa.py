@@ -1,20 +1,20 @@
 """
 QA API Routes
 """
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 router = APIRouter()
 
 
 class QARequest(BaseModel):
-    question: str
+    question: str = Field(min_length=1, max_length=8_000)
     filters: dict[str, Any] | None = None
-    mode: str = "hybrid"
-    limit: int = 10
+    mode: Literal["vector", "graph", "hybrid"] = "hybrid"
+    limit: int = Field(default=10, ge=1, le=100)
 
 
 class QAResponse(BaseModel):

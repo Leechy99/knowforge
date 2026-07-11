@@ -51,11 +51,18 @@ async def export_documents(
     request: Request,
     format: str = Query("markdown", enum=["markdown", "json", "graph"]),
     ids: str | None = None,
-    query: str | None = None,
+    query: str | None = Query(default=None, max_length=8_000),
 ):
     document_service = getattr(request.app.state, "document_service", None)
     if document_service is None:
         raise HTTPException(status_code=503, detail="Document service unavailable")
+    if ids:
+        doc_ids = [doc_id.strip() for doc_id in ids.split(",") if doc_id.strip()]
+        if len(doc_ids) > 100:
+            raise HTTPException(
+                status_code=422,
+                detail="At most 100 document IDs are allowed",
+            )
     documents = await _load_documents(document_service, ids, query)
     if not documents:
         raise HTTPException(status_code=404, detail="No documents found")

@@ -1,7 +1,7 @@
 """
 Failures API Routes
 """
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from src.learning.failure_tracker import FeedbackAction, ProcessingFailure
@@ -33,7 +33,10 @@ def _to_response(failure: ProcessingFailure) -> FailureResponse:
 
 
 @router.get("/failures", response_model=list[FailureResponse])
-async def list_failures(request: Request, limit: int = 20):
+async def list_failures(
+    request: Request,
+    limit: int = Query(default=20, ge=1, le=100),
+):
     tracker = getattr(request.app.state, "failure_tracker", None)
     if tracker is None:
         raise HTTPException(status_code=503, detail="Failure tracker unavailable")
