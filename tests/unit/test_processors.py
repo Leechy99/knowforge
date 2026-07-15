@@ -1,20 +1,19 @@
 """
 Unit tests for processors module
 """
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
-from src.processors.parser import (
-    BaseParser,
-    ParseResult,
-    PDFParser,
-    MarkdownParser,
-    HTMLParser,
-    ParserRegistry,
-)
+import pytest
+
+from src.processors.chunker import ContentChunker
 from src.processors.cleaner import ContentCleaner
 from src.processors.deduplicator import Deduplicator
-from src.processors.chunker import ContentChunker
+from src.processors.parser import (
+    HTMLParser,
+    MarkdownParser,
+    ParseResult,
+    ParserRegistry,
+    PDFParser,
+)
 from src.processors.vectorizer import ContentVectorizer
 
 
@@ -251,6 +250,8 @@ class TestDeduplicator:
     def test_different_threshold(self):
         dedup_strict = Deduplicator(similarity_threshold=0.95)
         dedup_lenient = Deduplicator(similarity_threshold=0.5)
+        assert dedup_strict.similarity_threshold == 0.95
+        assert dedup_lenient.similarity_threshold == 0.5
 
 
 class TestContentChunker:
@@ -363,14 +364,10 @@ class TestContentVectorizer:
             assert "index" in chunk
 
     def test_encode_single_returns_vector(self):
-        # Verify the method signature
-        text = "test"
-        # encode_single should return a list of floats
-        # Actual encoding needs model to be loaded
-        pass
+        assert self.vectorizer.encode_single("test") == pytest.approx([0.1, 0.2, 0.3])
 
     def test_encode_returns_list_of_lists(self):
-        # Verify the return type signature
-        texts = ["test1", "test2"]
-        # Should return list[list[float]]
-        pass
+        vectors = self.vectorizer.encode(["test1", "test2"])
+        assert len(vectors) == 2
+        for vector in vectors:
+            assert vector == pytest.approx([0.1, 0.2, 0.3])

@@ -1,10 +1,10 @@
 """Processor Node - Base class for parallel processor workers"""
-from abc import ABC, abstractmethod
-from enum import Enum
-from dataclasses import dataclass, field
-from typing import Any
 import asyncio
 import time
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
 
 
 class HealthStatus(Enum):
@@ -34,7 +34,11 @@ class ProcessorNode(ABC):
         self.max_retries = max_retries
         self.base_delay = base_delay
         self.backoff_factor = backoff_factor
-        self._metrics = {"processed": 0, "errors": 0, "total_time": 0.0}
+        self._metrics: dict[str, float] = {
+            "processed": 0,
+            "errors": 0,
+            "total_time": 0.0,
+        }
         self._running = False
 
     @property
@@ -52,8 +56,8 @@ class ProcessorNode(ABC):
         count = self._metrics["processed"]
         avg = self._metrics["total_time"] / count if count > 0 else 0.0
         return NodeMetrics(
-            processed_count=count,
-            error_count=self._metrics["errors"],
+            processed_count=int(count),
+            error_count=int(self._metrics["errors"]),
             avg_process_time=avg,
         )
 
@@ -67,7 +71,7 @@ class ProcessorNode(ABC):
 
     async def process_with_retry(self, data: dict[str, Any]) -> dict[str, Any]:
         """Process data with exponential backoff retry."""
-        last_error = None
+        last_error: Exception | None = None
         for attempt in range(self.max_retries):
             try:
                 start_time = time.perf_counter()
@@ -82,6 +86,8 @@ class ProcessorNode(ABC):
                 if attempt < self.max_retries - 1:
                     delay = self.base_delay * (self.backoff_factor ** attempt)
                     await asyncio.sleep(delay)
+        if last_error is None:
+            raise RuntimeError("Processor failed without an exception")
         raise last_error
 
     @abstractmethod

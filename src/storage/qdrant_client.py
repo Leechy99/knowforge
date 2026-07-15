@@ -4,8 +4,7 @@ Qdrant Vector Store Client
 from typing import Any
 
 from qdrant_client import QdrantClient
-from qdrant_client.http import models
-from qdrant_client.http.models import Distance, VectorParams, PointStruct
+from qdrant_client.http.models import Distance, PointStruct, VectorParams
 
 
 class QdrantVectorStore:
@@ -16,12 +15,12 @@ class QdrantVectorStore:
         url: str = "http://localhost:6333",
         dimension: int = 1024,
         collection_name: str = COLLECTION_NAME,
-    ):
-        self.client = QdrantClient(url=url)
+    ) -> None:
+        self.client: Any = QdrantClient(url=url)
         self.dimension = dimension
         self.collection_name = collection_name
 
-    def create_collection(self, recreate: bool = False):
+    def create_collection(self, recreate: bool = False) -> None:
         if recreate:
             self.client.delete_collection(self.collection_name)
         self.client.create_collection(
@@ -32,7 +31,7 @@ class QdrantVectorStore:
     def health_check(self) -> None:
         self.client.get_collections()
 
-    def upsert_vectors(self, points: list[dict[str, Any]]):
+    def upsert_vectors(self, points: list[dict[str, Any]]) -> None:
         self.client.upsert(
             collection_name=self.collection_name,
             points=[

@@ -5,14 +5,14 @@ chunks, entities, and their relationships across all supported content types.
 """
 
 from datetime import datetime
-from enum import Enum
-from typing import Annotated, Optional
+from enum import StrEnum
+from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     """Origin of the content ingestion."""
 
     FILE = "file"
@@ -20,7 +20,7 @@ class SourceType(str, Enum):
     DB = "db"
 
 
-class ContentType(str, Enum):
+class ContentType(StrEnum):
     """Type of content being processed."""
 
     ARTICLE = "article"
@@ -36,16 +36,16 @@ class ContentMetadata(BaseModel):
 
     source_type: SourceType
     content_type: ContentType
-    source_url: Optional[str] = None
-    source_path: Optional[str] = None
-    filename: Optional[str] = None
-    file_size: Optional[int] = None
-    mime_type: Optional[str] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
-    author: Optional[str] = None
-    created_at: Optional[datetime] = None
-    modified_at: Optional[datetime] = None
+    source_url: str | None = None
+    source_path: str | None = None
+    filename: str | None = None
+    file_size: int | None = None
+    mime_type: str | None = None
+    title: str | None = None
+    description: str | None = None
+    author: str | None = None
+    created_at: datetime | None = None
+    modified_at: datetime | None = None
     tags: list[str] = Field(default_factory=list)
     custom_fields: dict[str, str] = Field(default_factory=dict)
 
@@ -61,7 +61,7 @@ class ContentChunk(BaseModel):
     content: str
     start_char: int
     end_char: int
-    token_count: Optional[int] = None
+    token_count: int | None = None
 
 
 class ContentEntity(BaseModel):
@@ -73,7 +73,7 @@ class ContentEntity(BaseModel):
     document_id: UUID
     entity_type: str
     entity_value: str
-    summary: Optional[str] = None
+    summary: str | None = None
     confidence: float = Field(ge=0.0, le=1.0)
     metadata: dict[str, str] = Field(default_factory=dict)
 
@@ -118,8 +118,8 @@ class ContentBody(BaseModel):
     body_id: UUID = Field(default_factory=uuid4)
     document_id: UUID
     content: str
-    raw_content: Optional[str] = None
-    language: Optional[str] = None
+    raw_content: str | None = None
+    language: str | None = None
 
 
 class ContentDocument(BaseModel):
@@ -138,8 +138,8 @@ class ContentDocument(BaseModel):
     @field_validator("chunks", "entities", "relations", "vectors")
     @classmethod
     def validate_lists_not_empty_for_processed(
-        cls, v: list, info
-    ) -> list:
+        cls, v: list[Any], info: ValidationInfo
+    ) -> list[Any]:
         """Warn if lists are empty for processed documents."""
         return v
 

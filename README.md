@@ -105,7 +105,9 @@ manual test-time service injection.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | Health check |
+| `GET` | `/health` | Backward-compatible process health check |
+| `GET` | `/health/live` | Process liveness check |
+| `GET` | `/health/ready` | PostgreSQL, Qdrant, and Neo4j readiness check |
 | `POST` | `/api/v1/qa` | RAG-style question answering |
 | `POST` | `/api/v1/search` | Vector similarity search |
 | `GET` | `/api/v1/export` | Export documents |
@@ -126,14 +128,8 @@ ruff check src tests
 mypy src
 ```
 
-Current test status in this workspace:
-
-```text
-334 passed
-```
-
-`ruff` and `mypy` are enabled but still surface existing cleanup/type-debt items. The
-runtime test suite is the current source of truth for the first development phase.
+The CI workflow enforces Ruff, strict MyPy, and the complete pytest suite on every
+push and pull request. Run the same three commands locally before publishing changes.
 
 ## Project Status
 

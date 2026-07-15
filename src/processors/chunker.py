@@ -1,8 +1,9 @@
 """
 Content Chunking - Split content into manageable chunks
 """
-import tiktoken
 from typing import Any
+
+import tiktoken
 
 
 class ContentChunker:
@@ -22,7 +23,7 @@ class ContentChunker:
             return []
         if len(tokens) <= self.chunk_size and len(text) > self.chunk_size:
             return self._chunk_by_char_window(text)
-        chunks = []
+        chunks: list[dict[str, Any]] = []
         for i in range(0, len(tokens), self.chunk_size - self.overlap):
             chunk_tokens = tokens[i : i + self.chunk_size]
             chunk_text = self.encoding.decode(chunk_tokens)
@@ -36,7 +37,7 @@ class ContentChunker:
         return chunks
 
     def _chunk_by_char_window(self, text: str) -> list[dict[str, Any]]:
-        chunks = []
+        chunks: list[dict[str, Any]] = []
         step = self.chunk_size - self.overlap
         for i in range(0, len(text), step):
             chunk_text = text[i : i + self.chunk_size]
@@ -56,7 +57,7 @@ class ContentChunker:
 
     def chunk_by_paragraphs(self, text: str, max_chunk_size: int = 1024) -> list[dict[str, Any]]:
         paragraphs = text.split("\n\n")
-        chunks = []
+        chunks: list[dict[str, Any]] = []
         current_chunk = ""
         current_tokens = 0
         for para in paragraphs:

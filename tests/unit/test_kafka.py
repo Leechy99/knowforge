@@ -1,15 +1,13 @@
 """Unit tests for Kafka producer and consumer."""
 
-import json
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
 
+from src.kafka.consumer import ErrorAggregator, KafkaEventConsumer
 from src.kafka.producer import KafkaEventProducer
-from src.kafka.consumer import KafkaEventConsumer, KafkaConsumerError, ErrorAggregator
 
 
 class TestKafkaEventProducer:
@@ -71,9 +69,9 @@ class TestKafkaEventProducer:
         source_identifier = "/path/to/doc.pdf"
         metadata = {"file_size": 1024, "mime_type": "application/pdf"}
 
+        fixed_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
         with patch("src.kafka.producer.uuid4", return_value=uuid4()):
-            with patch("src.kafka.producer.datetime") as mock_datetime:
-                mock_datetime.utcnow.return_value = datetime(2024, 1, 1, 12, 0, 0)
+            with patch("src.kafka.producer.utc_now", return_value=fixed_time):
                 event_id = await producer.publish_document_ingested(
                     source_type, source_identifier, metadata
                 )
@@ -85,6 +83,7 @@ class TestKafkaEventProducer:
         event_sent = call_args[0][1]
         assert event_sent["source_type"] == source_type
         assert event_sent["payload"]["source_identifier"] == source_identifier
+        assert event_sent["timestamp"] == "2024-01-01T12:00:00+00:00"
 
     @pytest.mark.asyncio
     async def test_publish_document_ingested_unknown_source_type(self, producer):

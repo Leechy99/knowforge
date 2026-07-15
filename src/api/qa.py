@@ -6,7 +6,6 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-
 router = APIRouter()
 
 
@@ -24,7 +23,7 @@ class QAResponse(BaseModel):
 
 
 @router.post("/qa", response_model=QAResponse)
-async def ask_question(request: Request, payload: QARequest):
+async def ask_question(request: Request, payload: QARequest) -> QAResponse:
     qa_service = getattr(request.app.state, "qa_service", None)
     if qa_service is None:
         raise HTTPException(status_code=503, detail="QA service unavailable")

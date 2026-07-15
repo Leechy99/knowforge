@@ -3,15 +3,18 @@ PostgreSQL Client with pgvector support
 """
 import inspect
 import uuid
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import Column, DateTime, Float, Index, String, Text, or_, select, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 
-Base = declarative_base()
+from src.utils.time import utc_now
+
+
+class Base(DeclarativeBase):
+    """SQLAlchemy declarative model base."""
 
 
 class DocumentRecord(Base):
@@ -25,8 +28,8 @@ class DocumentRecord(Base):
     content_text = Column(Text, nullable=False, default="")
     chunks = Column(JSONB, nullable=False, default=list)
     quality_score = Column(Float, nullable=False, default=0.0)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    processed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
+    processed_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("idx_source_type", "source_type"),
@@ -64,11 +67,11 @@ class PostgresClient:
         self.engine = create_async_engine(dsn, echo=False)
         self.session_factory = async_sessionmaker(self.engine, class_=AsyncSession)
 
-    async def init(self):
+    async def init(self) -> None:
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-    async def close(self):
+    async def close(self) -> None:
         await self.engine.dispose()
 
     async def health_check(self) -> None:
@@ -87,11 +90,9 @@ class PostgresClient:
                 content_text=doc.get("content", {}).get("text", ""),
                 chunks=doc.get("content", {}).get("chunks", []),
                 quality_score=doc.get("quality_score", 0.0),
-                processed_at=datetime.utcnow(),
+                processed_at=utc_now(),
             )
-            add_result = session.add(record)
-            if inspect.isawaitable(add_result):
-                await add_result
+            session.add(record)
             await session.commit()
             return str(record.id)
         finally:

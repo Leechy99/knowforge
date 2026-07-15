@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.connectors.file_watcher import FileWatcherConnector, FileWatcherHandler
-from src.connectors.github_connector import GitHubConnector
 from src.connectors.crawl_connector import CrawlConnector
 from src.connectors.db_connector import DatabaseConnector
+from src.connectors.file_watcher import FileWatcherConnector, FileWatcherHandler
+from src.connectors.github_connector import GitHubConnector
 
 
 class TestFileWatcherConnector:

@@ -2,10 +2,11 @@
 Unit tests for storage layer clients
 """
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
 
 class TestPostgresClient:
@@ -38,7 +39,7 @@ class TestPostgresClient:
 
                 client = PostgresClient("postgresql://localhost/test")
 
-                mock_session = AsyncMock()
+                mock_session = MagicMock()
                 mock_session_factory = MagicMock(return_value=mock_session)
                 mock_sessionmaker.return_value = mock_session_factory
 
@@ -73,8 +74,8 @@ class TestPostgresClient:
                 mock_record.content_text = "content"
                 mock_record.chunks = []
                 mock_record.quality_score = 0.5
-                mock_record.created_at = datetime.utcnow()
-                mock_record.processed_at = datetime.utcnow()
+                mock_record.created_at = datetime.now(UTC)
+                mock_record.processed_at = datetime.now(UTC)
 
                 mock_session = AsyncMock()
                 mock_session.get = AsyncMock(return_value=mock_record)
@@ -128,8 +129,8 @@ class TestPostgresClient:
                 mock_record.content_text = "content"
                 mock_record.chunks = []
                 mock_record.quality_score = 0.5
-                mock_record.created_at = datetime.utcnow()
-                mock_record.processed_at = datetime.utcnow()
+                mock_record.created_at = datetime.now(UTC)
+                mock_record.processed_at = datetime.now(UTC)
 
                 mock_result = MagicMock()
                 mock_result.scalars.return_value = [mock_record]
@@ -163,8 +164,8 @@ class TestPostgresClient:
                 mock_record.content_text = "content"
                 mock_record.chunks = []
                 mock_record.quality_score = 0.5
-                mock_record.created_at = datetime.utcnow()
-                mock_record.processed_at = datetime.utcnow()
+                mock_record.created_at = datetime.now(UTC)
+                mock_record.processed_at = datetime.now(UTC)
 
                 mock_result = MagicMock()
                 mock_result.scalars.return_value = [mock_record]
@@ -330,7 +331,7 @@ class TestNeo4jGraphStore:
 
             mock_session = AsyncMock()
             mock_result = AsyncMock()
-            mock_result.__aiter__ = lambda self: iter([{"n": {"name": "Test"}}])
+            mock_result.__aiter__.return_value = [{"n": {"name": "Test"}}]
             mock_session.run = AsyncMock(return_value=mock_result)
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
@@ -381,13 +382,34 @@ class TestMinioFileStore:
 
         with patch("src.storage.minio_client.boto3") as mock_boto3:
             mock_client = MagicMock()
-            mock_client.head_bucket.side_effect = Exception("Not found")
+            mock_client.head_bucket.side_effect = ClientError(
+                {"Error": {"Code": "404", "Message": "Not found"}},
+                "HeadBucket",
+            )
             mock_boto3.client.return_value = mock_client
 
             store = MinioFileStore(endpoint="localhost:9000", access_key="key", secret_key="secret")
             store.ensure_bucket()
 
             mock_client.create_bucket.assert_called_once_with(Bucket="knowforge")
+
+    def test_ensure_bucket_propagates_permission_error(self):
+        """Permission errors must not be mistaken for a missing bucket."""
+        from src.storage.minio_client import MinioFileStore
+
+        with patch("src.storage.minio_client.boto3") as mock_boto3:
+            mock_client = MagicMock()
+            mock_client.head_bucket.side_effect = ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "Denied"}},
+                "HeadBucket",
+            )
+            mock_boto3.client.return_value = mock_client
+            store = MinioFileStore(bucket_name="docs")
+
+            with pytest.raises(ClientError):
+                store.ensure_bucket()
+
+            mock_client.create_bucket.assert_not_called()
 
     def test_upload_raw_file(self):
         """Test uploading a raw file"""

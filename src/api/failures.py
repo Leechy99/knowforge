@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 from src.learning.failure_tracker import FeedbackAction, ProcessingFailure
 
-
 router = APIRouter()
 
 
@@ -36,7 +35,7 @@ def _to_response(failure: ProcessingFailure) -> FailureResponse:
 async def list_failures(
     request: Request,
     limit: int = Query(default=20, ge=1, le=100),
-):
+) -> list[FailureResponse]:
     tracker = getattr(request.app.state, "failure_tracker", None)
     if tracker is None:
         raise HTTPException(status_code=503, detail="Failure tracker unavailable")
@@ -44,7 +43,7 @@ async def list_failures(
 
 
 @router.get("/failures/{failure_id}", response_model=FailureResponse)
-async def get_failure(request: Request, failure_id: str):
+async def get_failure(request: Request, failure_id: str) -> FailureResponse:
     tracker = getattr(request.app.state, "failure_tracker", None)
     if tracker is None:
         raise HTTPException(status_code=503, detail="Failure tracker unavailable")
@@ -60,7 +59,11 @@ class FeedbackRequest(BaseModel):
 
 
 @router.post("/failures/{failure_id}/feedback")
-async def submit_feedback(request: Request, failure_id: str, payload: FeedbackRequest):
+async def submit_feedback(
+    request: Request,
+    failure_id: str,
+    payload: FeedbackRequest,
+) -> dict[str, str]:
     tracker = getattr(request.app.state, "failure_tracker", None)
     if tracker is None:
         raise HTTPException(status_code=503, detail="Failure tracker unavailable")

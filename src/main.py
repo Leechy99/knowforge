@@ -2,6 +2,7 @@
 AI Knowledge Base - FastAPI Application
 """
 import inspect
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -20,7 +21,7 @@ from src.storage.qdrant_client import QdrantVectorStore
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     app.state.settings = settings
     if not hasattr(app.state, "postgres_client"):
@@ -104,5 +105,5 @@ app.include_router(health.router, tags=["Health"])
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     return {"status": "healthy"}

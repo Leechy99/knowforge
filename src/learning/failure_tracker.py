@@ -4,13 +4,15 @@ Failure Tracker - Track and manage processing failures
 import uuid
 from collections import OrderedDict
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from src.utils.time import utc_now
 
-class FailureType(str, Enum):
+
+class FailureType(StrEnum):
     NETWORK_ERROR = "network_error"
     ENCODING_ERROR = "encoding_error"
     PARSE_ERROR = "parse_error"
@@ -19,7 +21,7 @@ class FailureType(str, Enum):
     QUALITY_TOO_LOW = "quality_too_low"
 
 
-class FailureStatus(str, Enum):
+class FailureStatus(StrEnum):
     PENDING = "pending"
     RETRY_SCHEDULED = "retry_scheduled"
     SKIPPED = "skipped"
@@ -27,7 +29,7 @@ class FailureStatus(str, Enum):
     IGNORED = "ignored"
 
 
-class FeedbackAction(str, Enum):
+class FeedbackAction(StrEnum):
     RETRY = "retry"
     SKIP = "skip"
     USER_PROCESSED = "user_processed"
@@ -54,8 +56,8 @@ class ProcessingFailure(BaseModel):
     user_instructions: str | None = None
     feedback_by: str | None = None
     feedback_at: datetime | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class FailureTracker:
@@ -69,7 +71,7 @@ class FailureTracker:
         postgres_dsn: str | None = None,
         max_size: int = DEFAULT_MAX_SIZE,
         ttl_hours: int = DEFAULT_TTL_HOURS,
-    ):
+    ) -> None:
         self.failures: OrderedDict[str, ProcessingFailure] = OrderedDict()
         self.postgres_dsn = postgres_dsn
         self.max_size = max_size
@@ -82,7 +84,7 @@ class FailureTracker:
 
     def _cleanup_expired(self) -> int:
         """Remove failures older than TTL. Returns count of removed items."""
-        cutoff = datetime.utcnow() - self.ttl
+        cutoff = utc_now() - self.ttl
         expired = [
             fid for fid, f in self.failures.items()
             if f.updated_at < cutoff and f.status in (
@@ -133,14 +135,14 @@ class FailureTracker:
         action: FeedbackAction,
         user_instructions: str | None = None,
         feedback_by: str | None = None,
-    ):
+    ) -> None:
         if failure_id not in self.failures:
             raise ValueError(f"Failure {failure_id} not found")
         failure = self.failures[failure_id]
         failure.feedback = action
         failure.user_instructions = user_instructions
         failure.feedback_by = feedback_by
-        failure.feedback_at = datetime.utcnow()
+        failure.feedback_at = utc_now()
         if action == FeedbackAction.SKIP:
             failure.status = FailureStatus.SKIPPED
         elif action == FeedbackAction.RETRY:
@@ -150,7 +152,7 @@ class FailureTracker:
             failure.status = FailureStatus.RESOLVED
         elif action == FeedbackAction.NEW_STRATEGY:
             failure.status = FailureStatus.RETRY_SCHEDULED
-        failure.updated_at = datetime.utcnow()
+        failure.updated_at = utc_now()
         self.failures.move_to_end(failure_id)
 
     def get_pending_failures(self, limit: int = 20) -> list[ProcessingFailure]:

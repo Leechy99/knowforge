@@ -4,10 +4,12 @@ Kafka Consumer - Consume events from Kafka with parallel processing pipeline
 import json
 import logging
 from collections import deque
-from datetime import datetime
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from aiokafka import AIOKafkaConsumer
+
+from src.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +42,7 @@ class ErrorAggregator:
                 "error": str(error),
                 "error_type": type(error).__name__,
                 "event": event or {},
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": utc_now().isoformat(),
             }
         )
 
@@ -103,7 +105,7 @@ class KafkaEventConsumer:
     def register_handler(self, event_type: str, handler: EventHandler) -> None:
         self.handlers[event_type] = handler
 
-    async def start(self, topics: list[str]):
+    async def start(self, topics: list[str]) -> None:
         self.consumer = AIOKafkaConsumer(
             *topics,
             bootstrap_servers=self.bootstrap_servers,
@@ -116,7 +118,7 @@ class KafkaEventConsumer:
         self._running = True
         self._shutdown = False
 
-    async def stop(self):
+    async def stop(self) -> None:
         self._running = False
         self._shutdown = True
         await self.coordinator.stop_all()
@@ -142,13 +144,13 @@ class KafkaEventConsumer:
                         "original_event": event,
                         "error": str(exc),
                         "error_type": type(exc).__name__,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": utc_now().isoformat(),
                     },
                 )
             else:
                 logger.exception("Error handling event %s", event_type)
 
-    async def consume(self):
+    async def consume(self) -> None:
         if not self.consumer:
             raise RuntimeError("Consumer not started")
         async for message in self.consumer:

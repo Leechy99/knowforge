@@ -6,7 +6,6 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-
 router = APIRouter()
 
 
@@ -22,7 +21,7 @@ class SearchResponse(BaseModel):
 
 
 @router.post("/search", response_model=SearchResponse)
-async def search_documents(request: Request, payload: SearchRequest):
+async def search_documents(request: Request, payload: SearchRequest) -> SearchResponse:
     search_service = getattr(request.app.state, "search_service", None)
     if search_service is None:
         raise HTTPException(status_code=503, detail="Search service unavailable")

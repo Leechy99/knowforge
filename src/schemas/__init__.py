@@ -1,14 +1,14 @@
 """Schema definitions for the AI Knowledge Base."""
 
 from src.schemas.content import (
-    ContentType,
-    ContentMetadata,
-    ContentChunk,
-    ContentEntity,
-    ContentRelation,
-    ContentVectors,
     ContentBody,
+    ContentChunk,
     ContentDocument,
+    ContentEntity,
+    ContentMetadata,
+    ContentRelation,
+    ContentType,
+    ContentVectors,
     SourceType,
 )
 from src.schemas.events import EventType, KafkaEvent

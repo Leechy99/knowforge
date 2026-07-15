@@ -85,7 +85,7 @@ class GraphExporter(ExportFormatter):
 
 
 class ExportService:
-    def __init__(self):
+    def __init__(self) -> None:
         self.formatters: dict[str, ExportFormatter] = {
             "markdown": MarkdownExporter(),
             "json": JSONExporter(),

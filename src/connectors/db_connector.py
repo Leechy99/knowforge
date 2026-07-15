@@ -1,9 +1,9 @@
 """
 Database Connector - Import data from existing databases
 """
-import asyncio
 import inspect
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import asyncpg
 
@@ -22,10 +22,10 @@ class DatabaseConnector:
         self.batch_size = batch_size
         self.pool: asyncpg.Pool | None = None
 
-    async def connect(self):
+    async def connect(self) -> None:
         self.pool = await asyncpg.create_pool(self.dsn, min_size=2, max_size=10)
 
-    async def close(self):
+    async def close(self) -> None:
         if self.pool:
             await self.pool.close()
 
@@ -36,8 +36,11 @@ class DatabaseConnector:
     ) -> AsyncGenerator[dict[str, Any], None]:
         if not self.pool:
             await self.connect()
+        pool = self.pool
+        if pool is None:
+            raise RuntimeError("Database pool unavailable")
         query = query or f"SELECT * FROM {self.table_name}"
-        async with self.pool.acquire() as conn:
+        async with pool.acquire() as conn:
             async with conn.transaction():
                 async for record in conn.cursor(query):
                     if columns:
@@ -48,12 +51,15 @@ class DatabaseConnector:
     async def get_records_count(self) -> int:
         if not self.pool:
             await self.connect()
-        acquired = self.pool.acquire()
+        pool = self.pool
+        if pool is None:
+            raise RuntimeError("Database pool unavailable")
+        acquired = pool.acquire()
         if not hasattr(acquired, "__aenter__") and inspect.isawaitable(acquired):
             acquired = await acquired
         async with acquired as conn:
             count = await conn.fetchval(f"SELECT COUNT(*) FROM {self.table_name}")
-            return count
+            return int(count)
 
     def transform_to_content_schema(self, record: dict[str, Any]) -> dict[str, Any]:
         return {

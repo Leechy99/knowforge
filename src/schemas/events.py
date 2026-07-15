@@ -5,14 +5,16 @@ used in async document processing pipeline.
 """
 
 from datetime import datetime
-from enum import Enum
-from typing import Any, Optional
+from enum import StrEnum
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.utils.time import utc_now
 
-class EventType(str, Enum):
+
+class EventType(StrEnum):
     """Types of events emitted during document processing."""
 
     DOCUMENT_INGESTED = "document.ingested"
@@ -28,19 +30,19 @@ class KafkaEvent(BaseModel):
 
     event_id: UUID = Field(default_factory=uuid4)
     event_type: EventType
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
     version: str = "1.0"
     source: str = "knowforge"
 
     # Document reference
-    document_id: Optional[UUID] = None
-    correlation_id: Optional[str] = None
+    document_id: UUID | None = None
+    correlation_id: str | None = None
 
     # Event-specific payload
     payload: dict[str, Any] = Field(default_factory=dict)
 
     # Error information (for failed events)
-    error: Optional[dict[str, Any]] = None
+    error: dict[str, Any] | None = None
 
     @property
     def is_error(self) -> bool:

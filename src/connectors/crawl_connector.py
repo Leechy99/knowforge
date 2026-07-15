@@ -43,7 +43,12 @@ class CrawlConnector:
                         "status_code": response.status_code,
                         "title": title.get_text(strip=True) if title else "",
                         "content": main_content.get_text(separator="\n", strip=True) if main_content else soup.get_text(separator="\n", strip=True),
-                        "links": [a.get("href") for a in soup.find_all("a", href=True) if self._is_valid_link(a["href"])],
+                        "links": [
+                            href
+                            for anchor in soup.find_all("a", href=True)
+                            if isinstance((href := anchor.get("href")), str)
+                            and self._is_valid_link(href)
+                        ],
                         "metadata": self._extract_metadata(soup),
                     }
             except Exception as e:
@@ -68,6 +73,6 @@ class CrawlConnector:
         for tag in soup.find_all("meta"):
             name = tag.get("name") or tag.get("property", "")
             content = tag.get("content", "")
-            if name and content:
+            if isinstance(name, str) and isinstance(content, str) and name and content:
                 metadata[name] = content
         return metadata

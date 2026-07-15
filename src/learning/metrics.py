@@ -6,20 +6,26 @@ from typing import Any
 
 
 class MetricsCollector:
-    def __init__(self):
+    def __init__(self) -> None:
         self.counters: dict[str, int] = defaultdict(int)
         self.gauges: dict[str, float] = {}
         self.histograms: dict[str, list[float]] = defaultdict(list)
 
-    def increment(self, metric: str, value: int = 1, labels: dict[str, str] | None = None):
+    def increment(
+        self, metric: str, value: int = 1, labels: dict[str, str] | None = None
+    ) -> None:
         key = self._format_key(metric, labels)
         self.counters[key] += value
 
-    def set_gauge(self, metric: str, value: float, labels: dict[str, str] | None = None):
+    def set_gauge(
+        self, metric: str, value: float, labels: dict[str, str] | None = None
+    ) -> None:
         key = self._format_key(metric, labels)
         self.gauges[key] = value
 
-    def record_histogram(self, metric: str, value: float, labels: dict[str, str] | None = None):
+    def record_histogram(
+        self, metric: str, value: float, labels: dict[str, str] | None = None
+    ) -> None:
         key = self._format_key(metric, labels)
         self.histograms[key].append(value)
 
@@ -44,7 +50,9 @@ class MetricsCollector:
             },
         }
 
-    def record_document_processed(self, success: bool, quality_score: float, processing_time_ms: int):
+    def record_document_processed(
+        self, success: bool, quality_score: float, processing_time_ms: int
+    ) -> None:
         self.increment("documents_processed", 1)
         self.increment("documents_processed_success" if success else "documents_processed_failure")
         self.record_histogram("processing_time_ms", processing_time_ms)
@@ -53,7 +61,7 @@ class MetricsCollector:
         if total > 0:
             self.set_gauge("success_rate", self.counters["documents_processed_success"] / total)
 
-    def record_failure(self, failure_type: str):
+    def record_failure(self, failure_type: str) -> None:
         self.increment("failures_total")
         self.increment(f"failures_by_type{{type={failure_type}}}")
 
