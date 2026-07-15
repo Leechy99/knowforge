@@ -1,11 +1,10 @@
 """Pipeline Coordinator - Central orchestrator for parallel processing"""
+import asyncio
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-import asyncio
-
 if TYPE_CHECKING:
-    from src.processors.parallel.node import ProcessorNode, NodeMetrics, HealthStatus
+    from src.processors.parallel.node import HealthStatus, NodeMetrics, ProcessorNode
 else:
     # Avoid triggering full package import to prevent missing dependency errors
     import sys

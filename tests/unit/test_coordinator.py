@@ -1,10 +1,11 @@
 """
 Unit tests for PipelineCoordinator
 """
-import pytest
 import importlib.util
 import sys
 from pathlib import Path
+
+import pytest
 
 # Directly load the module without triggering package __init__.py
 _node_path = Path(__file__).parent.parent.parent / "src" / "processors" / "parallel" / "node.py"

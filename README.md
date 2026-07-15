@@ -63,6 +63,12 @@ cp docker/.env.example .env
 
 Edit `.env` as needed for your local services.
 
+The canonical runtime variables are `POSTGRES_DSN`, `QDRANT_URL`,
+`QDRANT_COLLECTION_NAME`, `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`,
+`MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET_NAME`,
+`EMBEDDING_MODEL`, and `EMBEDDING_DIMENSION`. Keep the embedding model and vector
+dimension aligned; the default BGE large Chinese model uses 1024 dimensions.
+
 ### 4. Run tests
 
 ```bash
@@ -99,7 +105,9 @@ manual test-time service injection.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | Health check |
+| `GET` | `/health` | Backward-compatible process health check |
+| `GET` | `/health/live` | Process liveness check |
+| `GET` | `/health/ready` | PostgreSQL, Qdrant, and Neo4j readiness check |
 | `POST` | `/api/v1/qa` | RAG-style question answering |
 | `POST` | `/api/v1/search` | Vector similarity search |
 | `GET` | `/api/v1/export` | Export documents |
@@ -120,14 +128,8 @@ ruff check src tests
 mypy src
 ```
 
-Current test status in this workspace:
-
-```text
-334 passed
-```
-
-`ruff` and `mypy` are enabled but still surface existing cleanup/type-debt items. The
-runtime test suite is the current source of truth for the first development phase.
+The CI workflow enforces Ruff, strict MyPy, and the complete pytest suite on every
+push and pull request. Run the same three commands locally before publishing changes.
 
 ## Project Status
 

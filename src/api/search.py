@@ -4,15 +4,14 @@ Search API Routes
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
-
+from pydantic import BaseModel, Field
 
 router = APIRouter()
 
 
 class SearchRequest(BaseModel):
-    query: str
-    limit: int = 20
+    query: str = Field(min_length=1, max_length=8_000)
+    limit: int = Field(default=20, ge=1, le=100)
     filters: dict[str, Any] | None = None
 
 
@@ -22,7 +21,7 @@ class SearchResponse(BaseModel):
 
 
 @router.post("/search", response_model=SearchResponse)
-async def search_documents(request: Request, payload: SearchRequest):
+async def search_documents(request: Request, payload: SearchRequest) -> SearchResponse:
     search_service = getattr(request.app.state, "search_service", None)
     if search_service is None:
         raise HTTPException(status_code=503, detail="Search service unavailable")

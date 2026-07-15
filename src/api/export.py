@@ -2,14 +2,12 @@
 Export API Routes
 """
 import inspect
-from typing import Any
+from typing import Any, cast
 
-from fastapi import APIRouter, HTTPException, Query
-from fastapi import Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 
 from src.query.export import ExportService
-
 
 router = APIRouter()
 export_service = ExportService()
@@ -29,7 +27,10 @@ async def _load_documents(
     if ids:
         doc_ids = [doc_id.strip() for doc_id in ids.split(",") if doc_id.strip()]
         if hasattr(document_service, "get_documents"):
-            return await _maybe_await(document_service.get_documents(doc_ids))
+            return cast(
+                list[dict[str, Any]],
+                await _maybe_await(document_service.get_documents(doc_ids)),
+            )
         if hasattr(document_service, "get_document"):
             documents = [
                 await _maybe_await(document_service.get_document(doc_id))
@@ -38,10 +39,16 @@ async def _load_documents(
             return [doc for doc in documents if doc]
 
     if query and hasattr(document_service, "search_documents"):
-        return await _maybe_await(document_service.search_documents(query))
+        return cast(
+            list[dict[str, Any]],
+            await _maybe_await(document_service.search_documents(query)),
+        )
 
     if hasattr(document_service, "list_documents"):
-        return await _maybe_await(document_service.list_documents())
+        return cast(
+            list[dict[str, Any]],
+            await _maybe_await(document_service.list_documents()),
+        )
 
     return []
 
@@ -51,11 +58,18 @@ async def export_documents(
     request: Request,
     format: str = Query("markdown", enum=["markdown", "json", "graph"]),
     ids: str | None = None,
-    query: str | None = None,
-):
+    query: str | None = Query(default=None, max_length=8_000),
+) -> Response:
     document_service = getattr(request.app.state, "document_service", None)
     if document_service is None:
         raise HTTPException(status_code=503, detail="Document service unavailable")
+    if ids:
+        doc_ids = [doc_id.strip() for doc_id in ids.split(",") if doc_id.strip()]
+        if len(doc_ids) > 100:
+            raise HTTPException(
+                status_code=422,
+                detail="At most 100 document IDs are allowed",
+            )
     documents = await _load_documents(document_service, ids, query)
     if not documents:
         raise HTTPException(status_code=404, detail="No documents found")

@@ -1,6 +1,6 @@
 """
 API Routes Package
 """
-from src.api import qa, search, export, failures
+from src.api import export, failures, health, qa, search
 
-__all__ = ["qa", "search", "export", "failures"]
+__all__ = ["export", "failures", "health", "qa", "search"]

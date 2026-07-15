@@ -1,6 +1,6 @@
 """Unit tests for schema definitions."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -330,7 +330,8 @@ class TestEventSchemas:
 
     def test_kafka_event_timestamp_default(self):
         """Test KafkaEvent timestamp is auto-generated."""
-        before = datetime.utcnow()
+        before = datetime.now(UTC)
         event = KafkaEvent(event_type=EventType.DOCUMENT_INGESTED)
-        after = datetime.utcnow()
+        after = datetime.now(UTC)
         assert before <= event.timestamp <= after
+        assert event.timestamp.tzinfo is UTC

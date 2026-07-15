@@ -2,7 +2,6 @@
 Content Deduplicator - Detect and remove duplicate content
 """
 import hashlib
-from typing import Any
 
 
 class Deduplicator:
@@ -40,6 +39,6 @@ class Deduplicator:
         self.seen_hashes.add(content_hash)
         return False, None
 
-    def reset(self):
+    def reset(self) -> None:
         self.seen_hashes.clear()
         self.seen_simples.clear()

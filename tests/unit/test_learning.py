@@ -1,18 +1,18 @@
 """
 Unit tests for Learning System
 """
+from datetime import UTC
+
 import pytest
-from datetime import datetime
 
 from src.learning.failure_tracker import (
+    FailureStatus,
     FailureTracker,
     FailureType,
-    FailureStatus,
     FeedbackAction,
-    ProcessingFailure,
 )
-from src.learning.strategy_store import StrategyStore, LearnedStrategy
 from src.learning.metrics import MetricsCollector
+from src.learning.strategy_store import StrategyStore
 
 
 class TestFailureTracker:
@@ -37,6 +37,8 @@ class TestFailureTracker:
         assert failure.content_size == 1024
         assert failure.status == FailureStatus.PENDING
         assert failure.id in tracker.failures
+        assert failure.created_at.tzinfo is UTC
+        assert failure.updated_at.tzinfo is UTC
 
     def test_record_failure_truncates_preview(self):
         tracker = FailureTracker()
@@ -155,7 +157,7 @@ class TestFailureTracker:
     def test_get_pending_failures(self):
         tracker = FailureTracker()
         f1 = tracker.record_failure("a", "1", FailureType.NETWORK_ERROR, "err1")
-        f2 = tracker.record_failure("a", "2", FailureType.PARSE_ERROR, "err2")
+        tracker.record_failure("a", "2", FailureType.PARSE_ERROR, "err2")
         tracker.record_failure("a", "3", FailureType.SIZE_LIMIT, "err3")
         tracker.apply_feedback(f1.id, FeedbackAction.SKIP)
 

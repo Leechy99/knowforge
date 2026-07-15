@@ -2,10 +2,12 @@
 File Watcher Connector - Monitor folder for new files
 """
 import asyncio
+import os
 from pathlib import Path
 from typing import Any
+
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 from src.utils.file_utils import normalize_extension
 
@@ -14,7 +16,7 @@ class FileWatcherConnector:
     def __init__(
         self,
         watch_path: str,
-        supported_extensions: list[str] = None,
+        supported_extensions: list[str] | None = None,
         recursive: bool = True,
     ):
         self.watch_path = Path(watch_path)
@@ -22,10 +24,10 @@ class FileWatcherConnector:
             "pdf", "docx", "md", "markdown", "html", "htm", "txt", "json"
         ]
         self.recursive = recursive
-        self.observer: Observer | None = None
-        self.event_queue: asyncio.Queue = asyncio.Queue()
+        self.observer: Any | None = None
+        self.event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
 
-    def start(self):
+    def start(self) -> None:
         event_handler = FileWatcherHandler(
             supported_extensions=self.supported_extensions,
             event_queue=self.event_queue,
@@ -34,7 +36,7 @@ class FileWatcherConnector:
         self.observer.schedule(event_handler, str(self.watch_path), recursive=self.recursive)
         self.observer.start()
 
-    def stop(self):
+    def stop(self) -> None:
         if self.observer:
             self.observer.stop()
             self.observer.join()
@@ -42,19 +44,23 @@ class FileWatcherConnector:
     async def get_next_event(self) -> dict[str, Any] | None:
         try:
             return await asyncio.wait_for(self.event_queue.get(), timeout=1.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
 
 class FileWatcherHandler(FileSystemEventHandler):
-    def __init__(self, supported_extensions: list[str], event_queue: asyncio.Queue):
+    def __init__(
+        self,
+        supported_extensions: list[str],
+        event_queue: asyncio.Queue[dict[str, Any]],
+    ) -> None:
         self.supported_extensions = supported_extensions
         self.event_queue = event_queue
 
-    def on_created(self, event: FileSystemEvent):
+    def on_created(self, event: FileSystemEvent) -> None:
         if event.is_directory:
             return
-        file_path = Path(event.src_path)
+        file_path = Path(os.fsdecode(event.src_path))
         ext = normalize_extension(file_path.suffix)
         if ext in self.supported_extensions:
             try:
@@ -70,6 +76,6 @@ class FileWatcherHandler(FileSystemEventHandler):
                 })
             )
 
-    def on_modified(self, event: FileSystemEvent):
+    def on_modified(self, event: FileSystemEvent) -> None:
         if not event.is_directory:
             self.on_created(event)

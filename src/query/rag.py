@@ -4,9 +4,9 @@ RAG QA - Retrieval Augmented Generation for Question Answering
 from typing import Any
 
 from src.processors.vectorizer import ContentVectorizer
-from src.storage.qdrant_client import QdrantVectorStore
-from src.storage.postgres_client import PostgresClient
 from src.storage.neo4j_client import Neo4jGraphStore
+from src.storage.postgres_client import PostgresClient
+from src.storage.qdrant_client import QdrantVectorStore
 
 
 class RAGQA:
@@ -83,18 +83,4 @@ class RAGQA:
         question: str,
         context_docs: list[dict[str, Any]],
     ) -> str:
-        context_parts = []
-        for i, doc in enumerate(context_docs):
-            content = doc.get("payload", {}).get("content_text", "")
-            if content:
-                context_parts.append(f"[{i+1}] {content[:500]}...")
-        context = "\n\n".join(context_parts)
-        prompt = f"""Based on the following context, answer the question.
-
-Context:
-{context}
-
-Question: {question}
-
-Answer:"""
         return f"Based on {len(context_docs)} relevant documents, the answer would be generated here."

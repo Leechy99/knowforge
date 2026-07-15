@@ -3,17 +3,17 @@ Kafka Producer - Publish events to Kafka
 """
 import asyncio
 import json
-from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
 from aiokafka import AIOKafkaProducer
 
 from src.schemas.events import EventType
+from src.utils.time import utc_now
 
 
-class KafkaTopic(str, Enum):
+class KafkaTopic(StrEnum):
     """Kafka topic names."""
 
     FILE = "file-events"
@@ -35,14 +35,14 @@ class KafkaEventProducer:
             "db": KafkaTopic.DB.value,
         }
 
-    async def start(self):
+    async def start(self) -> None:
         self.producer = AIOKafkaProducer(
             bootstrap_servers=self.bootstrap_servers,
             value_serializer=lambda v: json.dumps(v, default=str).encode(),
         )
         await self.producer.start()
 
-    async def stop(self):
+    async def stop(self) -> None:
         if self.producer:
             await self.producer.stop()
             self.producer = None
@@ -76,11 +76,11 @@ class KafkaEventProducer:
         source_type: str,
         source_identifier: str,
         metadata: dict[str, Any],
-    ):
+    ) -> str:
         event = {
             "event_id": str(uuid4()),
             "event_type": EventType.DOCUMENT_INGESTED.value,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utc_now().isoformat(),
             "source_type": source_type,
             "payload": {
                 "source_identifier": source_identifier,
@@ -89,4 +89,4 @@ class KafkaEventProducer:
         }
         topic = KafkaTopic.for_source(source_type)
         await self.publish_with_retry(topic.value, event)
-        return event["event_id"]
+        return str(event["event_id"])

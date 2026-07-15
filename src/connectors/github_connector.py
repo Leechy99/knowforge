@@ -1,12 +1,13 @@
 """
 GitHub Connector - Fetch GitHub Trending and Repository Info
 """
-import asyncio
 import base64
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import httpx
+
+from src.utils.time import utc_now
 
 
 class GitHubConnector:
@@ -24,14 +25,15 @@ class GitHubConnector:
         since: str = "daily",
     ) -> list[dict[str, Any]]:
         url = f"{self.BASE_URL}/search/repositories"
-        params = {
-            "q": f"created:>{self._get_date_threshold(since)}",
+        query = f"created:>{self._get_date_threshold(since)}"
+        if language:
+            query += f" language:{language}"
+        params: dict[str, str | int] = {
+            "q": query,
             "sort": "stars",
             "order": "desc",
             "per_page": 100,
         }
-        if language:
-            params["q"] += f" language:{language}"
 
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=self.headers, params=params)
@@ -86,5 +88,5 @@ class GitHubConnector:
 
     def _get_date_threshold(self, since: str) -> str:
         days = {"daily": 1, "weekly": 7, "monthly": 30}.get(since, 1)
-        threshold = datetime.utcnow() - timedelta(days=days)
+        threshold = utc_now() - timedelta(days=days)
         return threshold.strftime("%Y-%m-%d")

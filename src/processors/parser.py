@@ -21,7 +21,7 @@ class ParseResult:
 
 class BaseParser(ABC):
     @abstractmethod
-    async def parse(self, content: bytes | str, **kwargs) -> ParseResult:
+    async def parse(self, content: bytes | str, **kwargs: Any) -> ParseResult:
         pass
 
     @property
@@ -31,13 +31,15 @@ class BaseParser(ABC):
 
 
 class PDFParser(BaseParser):
-    async def parse(self, content: bytes, **kwargs) -> ParseResult:
+    async def parse(self, content: bytes | str, **kwargs: Any) -> ParseResult:
         try:
             import pdfplumber
 
+            if isinstance(content, str):
+                content = content.encode()
             with pdfplumber.open(io.BytesIO(content)) as pdf:
-                text_parts = []
-                metadata = {}
+                text_parts: list[str] = []
+                metadata: dict[str, Any] = {}
                 if pdf.metadata:
                     metadata = {
                         "title": pdf.metadata.get("Title", ""),
@@ -64,11 +66,11 @@ _markdown_parser = markdown_it.MarkdownIt()
 
 
 class MarkdownParser(BaseParser):
-    async def parse(self, content: str | bytes, **kwargs) -> ParseResult:
+    async def parse(self, content: str | bytes, **kwargs: Any) -> ParseResult:
         if isinstance(content, bytes):
             content = content.decode("utf-8")
         _markdown_parser.parse(content)
-        metadata = {}
+        metadata: dict[str, Any] = {}
         if content.startswith("---"):
             parts = content.split("---", 2)
             if len(parts) >= 3:
@@ -94,7 +96,7 @@ _html_parser = "lxml"
 
 
 class HTMLParser(BaseParser):
-    async def parse(self, content: str | bytes, **kwargs) -> ParseResult:
+    async def parse(self, content: str | bytes, **kwargs: Any) -> ParseResult:
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="ignore")
         from bs4 import BeautifulSoup
@@ -114,17 +116,22 @@ class HTMLParser(BaseParser):
 
 
 class ParserRegistry:
-    def __init__(self):
+    def __init__(self) -> None:
         self.parsers: dict[str, BaseParser] = {}
 
-    def register(self, parser: BaseParser):
+    def register(self, parser: BaseParser) -> None:
         for ext in parser.supported_types:
             self.parsers[ext] = parser
 
     def get_parser(self, file_ext: str) -> BaseParser | None:
         return self.parsers.get(normalize_extension(file_ext))
 
-    async def parse(self, content: bytes | str, file_ext: str, **kwargs) -> ParseResult:
+    async def parse(
+        self,
+        content: bytes | str,
+        file_ext: str,
+        **kwargs: Any,
+    ) -> ParseResult:
         parser = self.get_parser(file_ext)
         if not parser:
             return ParseResult(content="", metadata={}, error=f"No parser for {file_ext}")

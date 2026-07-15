@@ -1,11 +1,12 @@
 """
 Unit tests for WorkerPool
 """
-import pytest
 import asyncio
 import importlib.util
 import sys
 from pathlib import Path
+
+import pytest
 
 # Directly load the module without triggering package __init__.py
 _module_path = Path(__file__).parent.parent.parent / "src" / "processors" / "parallel" / "pool.py"
@@ -272,3 +273,42 @@ class TestWorkerPoolIntegration:
             await asyncio.sleep(0.3)
 
         # Pool should have shut down gracefully after context exit
+
+    @pytest.mark.asyncio
+    async def test_failed_task_is_recorded_and_later_task_runs(self):
+        pool = WorkerPool(max_workers=1)
+        await pool.start()
+        ran = []
+
+        async def fail():
+            raise ValueError("bad task")
+
+        async def succeed():
+            ran.append(True)
+
+        await pool.submit(fail)
+        await pool.submit(succeed)
+        await pool._tasks.join()
+
+        failures = pool.get_failures()
+        assert ran == [True]
+        assert len(failures) == 1
+        assert failures[0].error_type == "ValueError"
+        assert sum(worker.tasks_failed for worker in pool.get_workers()) == 1
+        assert sum(worker.tasks_completed for worker in pool.get_workers()) == 1
+        await pool.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_failure_buffer_is_bounded(self):
+        pool = WorkerPool(max_workers=1, max_failures=2)
+        await pool.start()
+
+        async def fail(index):
+            raise RuntimeError(str(index))
+
+        for index in range(3):
+            await pool.submit(fail, index)
+        await pool._tasks.join()
+
+        assert [failure.message for failure in pool.get_failures()] == ["1", "2"]
+        await pool.shutdown()

@@ -2,12 +2,13 @@
 AI Knowledge Base - FastAPI Application
 """
 import inspect
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api import export, failures, qa, search
+from src.api import export, failures, health, qa, search
 from src.config import get_settings
 from src.learning.failure_tracker import FailureTracker
 from src.processors.vectorizer import ContentVectorizer
@@ -20,13 +21,17 @@ from src.storage.qdrant_client import QdrantVectorStore
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     app.state.settings = settings
     if not hasattr(app.state, "postgres_client"):
         app.state.postgres_client = PostgresClient(dsn=settings.postgres_dsn)
     if not hasattr(app.state, "vector_store"):
-        app.state.vector_store = QdrantVectorStore(url=settings.qdrant_url)
+        app.state.vector_store = QdrantVectorStore(
+            url=settings.qdrant_url,
+            dimension=settings.embedding_dimension,
+            collection_name=settings.qdrant_collection_name,
+        )
     if not hasattr(app.state, "neo4j_client"):
         app.state.neo4j_client = Neo4jGraphStore(
             uri=settings.neo4j_uri,
@@ -34,7 +39,12 @@ async def lifespan(app: FastAPI):
             password=settings.neo4j_password,
         )
     if not hasattr(app.state, "vectorizer"):
-        app.state.vectorizer = ContentVectorizer()
+        app.state.vectorizer = ContentVectorizer(
+            model_name=settings.embedding_model,
+            dimension=settings.embedding_dimension,
+            batch_size=settings.embedding_batch_size,
+            device=settings.embedding_device,
+        )
     if not hasattr(app.state, "qa_service"):
         app.state.qa_service = RAGQA(
             vector_store=app.state.vector_store,
@@ -91,8 +101,9 @@ app.include_router(qa.router, prefix="/api/v1", tags=["QA"])
 app.include_router(search.router, prefix="/api/v1", tags=["Search"])
 app.include_router(export.router, prefix="/api/v1", tags=["Export"])
 app.include_router(failures.router, prefix="/api/v1", tags=["Failures"])
+app.include_router(health.router, tags=["Health"])
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     return {"status": "healthy"}

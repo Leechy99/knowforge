@@ -4,19 +4,22 @@ Neo4j Graph Store Client
 import inspect
 from typing import Any
 
-from neo4j import AsyncGraphDatabase, AsyncDriver
+from neo4j import AsyncDriver, AsyncGraphDatabase
 
 
 class Neo4jGraphStore:
     def __init__(self, uri: str = "bolt://localhost:7687", user: str = "neo4j", password: str = ""):
         self.driver: AsyncDriver = AsyncGraphDatabase.driver(uri, auth=(user, password))
 
-    async def close(self):
+    async def close(self) -> None:
         result = self.driver.close()
         if inspect.isawaitable(result):
             await result
 
-    async def create_document_graph(self, doc: dict[str, Any]):
+    async def health_check(self) -> None:
+        await self.driver.verify_connectivity()
+
+    async def create_document_graph(self, doc: dict[str, Any]) -> None:
         entities = doc.get("content", {}).get("entities", [])
         async with self.driver.session() as session:
             await session.run(
@@ -52,12 +55,7 @@ class Neo4jGraphStore:
     async def query_cypher(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         async with self.driver.session() as session:
             result = await session.run(cypher, params or {})
-            records = []
-            async_iter = result.__aiter__()
-            if hasattr(async_iter, "__anext__"):
-                async for record in result:
-                    records.append(dict(record))
-            else:
-                for record in async_iter:
-                    records.append(dict(record))
+            records: list[dict[str, Any]] = []
+            async for record in result:
+                records.append(dict(record))
             return records

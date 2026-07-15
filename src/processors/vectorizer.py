@@ -1,7 +1,8 @@
 """
 Content Vectorizer - Generate embeddings using BGE-large-zh
 """
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any, cast
 
 
 class ContentVectorizer:
@@ -12,15 +13,15 @@ class ContentVectorizer:
         batch_size: int = 32,
         device: str = "cpu",
         model_factory: Callable[..., Any] | None = None,
-    ):
+    ) -> None:
         self.model_name = model_name
         self.dimension = dimension
         self.batch_size = batch_size
         self.device = device
         self.model_factory = model_factory
-        self.model = None
+        self.model: Any | None = None
 
-    def load(self):
+    def load(self) -> None:
         if self.model is None:
             if self.model_factory is None:
                 from sentence_transformers import SentenceTransformer
@@ -28,14 +29,16 @@ class ContentVectorizer:
                 self.model_factory = SentenceTransformer
             self.model = self.model_factory(self.model_name, device=self.device)
 
-    def unload(self):
+    def unload(self) -> None:
         if self.model:
             del self.model
             self.model = None
 
-    def encode(self, texts: list[str], **kwargs) -> list[list[float]]:
+    def encode(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
         if self.model is None:
             self.load()
+        if self.model is None:
+            raise RuntimeError("Embedding model failed to load")
         embeddings = self.model.encode(
             texts,
             batch_size=self.batch_size,
@@ -43,7 +46,7 @@ class ContentVectorizer:
             show_progress_bar=False,
             **kwargs,
         )
-        return embeddings.tolist()
+        return cast(list[list[float]], embeddings.tolist())
 
     def encode_single(self, text: str) -> list[float]:
         return self.encode([text])[0]

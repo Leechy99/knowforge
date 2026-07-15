@@ -49,6 +49,45 @@ class TestHealthEndpoint:
         assert response.status_code == 200
         assert response.json() == {"status": "healthy"}
 
+    def test_liveness_check(self, client):
+        response = client.get("/health/live")
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "alive"}
+
+    def test_readiness_check_when_dependencies_are_ready(self, client):
+        app.state.postgres_client.health_check = AsyncQuery(None)
+        app.state.vector_store.health_check = lambda: None
+        app.state.neo4j_client.health_check = AsyncQuery(None)
+
+        response = client.get("/health/ready")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "status": "ready",
+            "dependencies": {
+                "postgres": "ready",
+                "qdrant": "ready",
+                "neo4j": "ready",
+            },
+        }
+
+    def test_readiness_check_sanitizes_dependency_failure(self, client):
+        app.state.postgres_client.health_check = AsyncQuery(None)
+
+        def fail_with_secret():
+            raise RuntimeError("postgresql://user:secret@localhost/db")
+
+        app.state.vector_store.health_check = fail_with_secret
+        app.state.neo4j_client.health_check = AsyncQuery(None)
+
+        response = client.get("/health/ready")
+
+        assert response.status_code == 503
+        assert response.json()["status"] == "not_ready"
+        assert response.json()["dependencies"]["qdrant"] == "unavailable"
+        assert "secret" not in response.text
+
 
 class TestAppStartup:
     def test_lifespan_initializes_query_and_document_services(self, client):
@@ -112,6 +151,25 @@ class TestQARoutes:
         )
         assert response.status_code == 422
 
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"question": ""},
+            {"question": "x" * 8001},
+            {"question": "ok", "mode": "invalid"},
+            {"question": "ok", "limit": 0},
+            {"question": "ok", "limit": 101},
+        ],
+    )
+    def test_ask_question_rejects_invalid_bounds(self, client, payload):
+        app.state.qa_service.ask = AsyncQuery(
+            {"answer": "unused", "sources": [], "mode": "hybrid"}
+        )
+
+        response = client.post("/api/v1/qa", json=payload)
+
+        assert response.status_code == 422
+
 
 class TestSearchRoutes:
     def test_search_uses_startup_service(self, client):
@@ -150,6 +208,22 @@ class TestSearchRoutes:
         )
         assert response.status_code == 422
 
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"query": ""},
+            {"query": "x" * 8001},
+            {"query": "ok", "limit": 0},
+            {"query": "ok", "limit": 101},
+        ],
+    )
+    def test_search_rejects_invalid_bounds(self, client, payload):
+        app.state.search_service.search = lambda **kwargs: []
+
+        response = client.post("/api/v1/search", json=payload)
+
+        assert response.status_code == 422
+
 
 class TestExportRoutes:
     def test_export_no_documents(self, client):
@@ -184,6 +258,18 @@ class TestExportRoutes:
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("application/json")
 
+    def test_export_rejects_more_than_100_ids(self, client):
+        ids = ",".join(f"doc-{index}" for index in range(101))
+
+        response = client.get("/api/v1/export", params={"ids": ids})
+
+        assert response.status_code == 422
+
+    def test_export_rejects_oversized_query(self, client):
+        response = client.get("/api/v1/export", params={"query": "x" * 8001})
+
+        assert response.status_code == 422
+
 
 class TestFailureRoutes:
     def test_list_failures_empty(self, client):
@@ -205,6 +291,12 @@ class TestFailureRoutes:
 
         assert response.status_code == 200
         assert len(response.json()) == 1
+
+    @pytest.mark.parametrize("limit", [0, 101])
+    def test_list_failures_rejects_invalid_limit(self, client, limit):
+        response = client.get("/api/v1/failures", params={"limit": limit})
+
+        assert response.status_code == 422
 
     def test_get_failure_not_found(self, client):
         response = client.get("/api/v1/failures/test-id-123")

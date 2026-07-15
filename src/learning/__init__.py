@@ -2,14 +2,14 @@
 Learning System - Failure tracking, strategy store, and metrics collection
 """
 from src.learning.failure_tracker import (
+    FailureStatus,
     FailureTracker,
     FailureType,
-    FailureStatus,
     FeedbackAction,
     ProcessingFailure,
 )
-from src.learning.strategy_store import StrategyStore, LearnedStrategy
 from src.learning.metrics import MetricsCollector, metrics
+from src.learning.strategy_store import LearnedStrategy, StrategyStore
 
 __all__ = [
     "FailureTracker",
